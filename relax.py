@@ -7,7 +7,10 @@ from pyrosetta import rosetta
 
 
 def get_pose_scores(pose):
-    '''Get the scores for a pose into a list of dictionaries.'''
+    '''Get the scores for a pose into a list of dictionaries.
+    The first dict stores the scores of the whole pose. The
+    rest of dicts store the scores of each residue.
+    '''
     # Get the non-zero weight score types
     
     weights = pose.energies().weights()
@@ -17,13 +20,58 @@ def get_pose_scores(pose):
     for k in score_types.keys():
         if k.startswith('__'): continue
         
-        print score_types[k]
-        if weights.get(score_types[k]) != 0:
+        if weights[score_types[k]] != 0:
             non_zero_weight_types.append(k)
 
-    print non_zero_weight_types
+    # Get whole pose scores
 
-    print pose.energies().total_energies().show_nonzero()
+    total_energies = pose.energies().total_energies() 
+    d_pose = {}
+
+    for t in non_zero_weight_types:
+        d_pose[t] = total_energies[score_types[t]]
+    d_pose['total_energy'] = pose.energies().total_energy()
+    
+    scores = [d_pose]
+
+    # Get residue scores
+
+    for i in range(1, pose.size() + 1):
+        res_energies = pose.energies().residue_total_energies(i) 
+        d_res = {}
+
+        for t in non_zero_weight_types:
+            d_res[t] = res_energies[score_types[t]]
+        d_res['total_energy'] = pose.energies().residue_total_energy(i)
+
+        scores.append(d_res)
+
+    return scores
+
+def sort_residues_by_abs_total_energy_diff(scores1, scores2):
+    '''Sort the residues by the absolute total score differences
+    in two list of scores. Then sort the energy terms for each
+    of the residue.
+    '''
+    energy_diff = []
+
+    for i in range(len(scores1)):
+        energy_diff_d = {}
+        for k in scores1[i].keys():
+            energy_diff_d[k] = scores2[i][k] - scores1[i][k]
+        
+        energy_diff.append((i, energy_diff_d))
+
+    energy_diff_sorted_dicts = sorted(energy_diff, key=lambda x : abs(x[1]['total_energy']), reverse=True)
+
+    # Generate the sorted table
+
+    energy_diff_sorted_table = []
+    for i, d in energy_diff_sorted_dicts:
+        pairs = sorted([(k, d[k]) for k in d.keys()], key=lambda x: abs(x[1]), reverse=True)
+        energy_diff_sorted_table.append((i, pairs))
+
+    return energy_diff_sorted_table
 
 def minimize(pose, residues_bb_movable, residues_sc_movable):
     '''Minimize the pose.'''
@@ -66,6 +114,7 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
     sfxn = rosetta.core.scoring.get_score_function()
     sfxn(pose)
     print 'score_before_relax =', pose.energies().total_energy()
+    scores_before_relax = get_pose_scores(pose)
 
     # Relax
    
@@ -75,10 +124,19 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
 
     sfxn(pose)
     print 'score_after_relax =', pose.energies().total_energy()
+    scores_after_relax = get_pose_scores(pose)
+
+    energy_diff_sorted_table = sort_residues_by_abs_total_energy_diff(scores_before_relax, scores_after_relax)
+
+    for i, v in energy_diff_sorted_table:
+        if abs(v[0][1]) < 0.3: continue
+        print i
+
+        big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
+        print '\t'.join(big_diffs)
 
     pose.dump_pdb(os.path.join('outputs', 'relaxed_' + os.path.basename(pdb_file)))
 
-    get_pose_scores(pose)
 
 
 if __name__ == '__main__':
@@ -97,4 +155,5 @@ if __name__ == '__main__':
     min_relax = lambda pose : minimize(pose, loop_residues_4am3, surrounding_residues_4am3)
 
     relax_structure('inputs/4ma3_native.pdb', ft, min_relax)
+    #relax_structure('inputs/4ma3_lowest_rmsd.pdb', ft, min_relax)
 
