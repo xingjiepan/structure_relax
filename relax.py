@@ -98,6 +98,58 @@ def minimize(pose, residues_bb_movable, residues_sc_movable):
 
     min_mover.apply(pose)
 
+def ramping_minimize(pose, residues_bb_movable, residues_sc_movable):
+    '''Minimize the pose.'''
+    sfxn = rosetta.core.scoring.get_score_function()
+    sfxn.set_weight(rosetta.core.scoring.chainbreak, 5)
+
+    mm = rosetta.core.kinematics.MoveMap()
+    mm.set_chi(False)
+    mm.set_bb(False)
+
+    for i in residues_bb_movable:
+        mm.set_bb(i, True)
+        mm.set_chi(i, True)
+    
+    for i in residues_sc_movable:
+        mm.set_chi(i, True)
+
+    min_opts = rosetta.core.optimization.MinimizerOptions( "lbfgs_armijo_nonmonotone", 0.01, True )
+
+    min_mover = rosetta.protocols.simple_moves.MinMover()
+    min_mover.movemap(mm)
+    min_mover.min_options(min_opts)
+
+    dun_weight = sfxn.get_weight(rosetta.core.scoring.fa_dun)
+    rep_weight = sfxn.get_weight(rosetta.core.scoring.fa_rep)
+
+    for ww in [0.1, 0.2, 0.5, 1]:
+        sfxn.set_weight(rosetta.core.scoring.fa_dun, ww * dun_weight)
+        sfxn.set_weight(rosetta.core.scoring.fa_dun, ww * rep_weight)
+        min_mover.score_function(sfxn)
+        min_mover.apply(pose)
+
+def fast_relax(pose, residues_bb_movable, residues_sc_movable):
+    '''Fast relax the pose'''
+    mm = rosetta.core.kinematics.MoveMap()
+    mm.set_chi(False)
+    mm.set_bb(False)
+
+    for i in residues_bb_movable:
+        mm.set_bb(i, True)
+        mm.set_chi(i, True)
+    
+    for i in residues_sc_movable:
+        mm.set_chi(i, True)
+
+    fast_relax_rounds = 5
+    sfxn = rosetta.core.scoring.get_score_function()
+    fast_relax = rosetta.protocols.relax.FastRelax(sfxn, fast_relax_rounds)
+    fast_relax.set_movemap(mm) 
+    
+    fast_relax.apply(pose)
+ 
+
 def relax_structure(pdb_file, fold_tree, relax_fun):
     '''Relax the structure from a pdb file.
     Dump the relaxed structure.
@@ -128,12 +180,14 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
 
     energy_diff_sorted_table = sort_residues_by_abs_total_energy_diff(scores_before_relax, scores_after_relax)
 
-    for i, v in energy_diff_sorted_table:
-        if abs(v[0][1]) < 0.3: continue
-        print i
+    # Print score differences
 
-        big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
-        print '\t'.join(big_diffs)
+    #for i, v in energy_diff_sorted_table:
+    #    if abs(v[0][1]) < 0.3: continue
+    #    print i
+
+    #    big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
+    #    print '\t'.join(big_diffs)
 
     pose.dump_pdb(os.path.join('outputs', 'relaxed_' + os.path.basename(pdb_file)))
 
@@ -144,16 +198,23 @@ if __name__ == '__main__':
 
     loop_residues_4am3 = list(range(311,321))
 
-    surrounding_residues_4am3 = [2, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 64, 66, 67, 68, 71, 87, 88, 89, 90, 91, 92, 93, 94, 98, 99, 100, 101, 102, 103, 219, 220, 221, 222, 223, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 274, 275, 276, 278, 285, 287, 291, 292, 293, 294, 295, 306, 307, 308, 309, 310, 322, 323, 324, 325]
+    surrounding_residues_4am3 = [2, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 64, 66, 67, 68, 71, 87, 88, 89, 90, 91, 92, 93, 94, 98, 99, 100, 101, 102, 103, 219, 220, 221, 222, 223, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 274, 275, 276, 278, 285, 287, 291, 292, 293, 294, 295, 306, 307, 308, 309, 310, 321, 322, 323, 324, 325]
 
     ft = rosetta.core.kinematics.FoldTree()
-    ft.add_edge(1, 322, 1)
-    ft.add_edge(1, 320, -1)
-    ft.add_edge(322, 321, -1)
-    ft.add_edge(322, 433, -1)
+    ft.add_edge(1, 321, 1)
+    ft.add_edge(1, 319, -1)
+    ft.add_edge(321, 320, -1)
+    ft.add_edge(321, 433, -1)
 
-    min_relax = lambda pose : minimize(pose, loop_residues_4am3, surrounding_residues_4am3)
+    #min_relax = lambda pose : minimize(pose, loop_residues_4am3, surrounding_residues_4am3)
+    #min_relax = lambda pose : minimize(pose, list(range(1, 434)), [])
+    #min_relax = lambda pose : minimize(pose, loop_residues_4am3, list(range(1, 434)))
+    #min_relax = lambda pose : ramping_minimize(pose, loop_residues_4am3, list(range(1, 434)))
+    
+    min_relax = lambda pose : fast_relax(pose, loop_residues_4am3, surrounding_residues_4am3)
 
-    relax_structure('inputs/4ma3_native.pdb', ft, min_relax)
-    #relax_structure('inputs/4ma3_lowest_rmsd.pdb', ft, min_relax)
+    #relax_structure('inputs/4ma3_native.pdb', ft, min_relax)
+    #relax_structure('inputs/4ma3_native_with_lowest_rmsd_rotamers.pdb', ft, min_relax)
+    relax_structure('inputs/4ma3_lowest_rmsd.pdb', ft, min_relax)
+    #relax_structure('inputs/4ma3_lowest_score.pdb', ft, min_relax)
 
