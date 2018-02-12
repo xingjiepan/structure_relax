@@ -206,15 +206,17 @@ if __name__ == '__main__':
     ft.add_edge(321, 320, -1)
     ft.add_edge(321, 433, -1)
 
-    #min_relax = lambda pose : minimize(pose, loop_residues_4am3, surrounding_residues_4am3)
-    #min_relax = lambda pose : minimize(pose, list(range(1, 434)), [])
-    #min_relax = lambda pose : minimize(pose, loop_residues_4am3, list(range(1, 434)))
-    #min_relax = lambda pose : ramping_minimize(pose, loop_residues_4am3, list(range(1, 434)))
+    #relax_fun = lambda pose : minimize(pose, loop_residues_4am3, surrounding_residues_4am3)
+    #relax_fun = lambda pose : minimize(pose, list(range(1, 434)), [])
+    #relax_fun = lambda pose : minimize(pose, loop_residues_4am3, list(range(1, 434)))
+    #relax_fun = lambda pose : ramping_minimize(pose, loop_residues_4am3, list(range(1, 434)))
     
-    min_relax = lambda pose : fast_relax(pose, loop_residues_4am3, surrounding_residues_4am3)
+    relax_fun = lambda pose : fast_relax(pose, loop_residues_4am3, surrounding_residues_4am3)
 
-    #relax_structure('inputs/4ma3_native.pdb', ft, min_relax)
-    #relax_structure('inputs/4ma3_native_with_lowest_rmsd_rotamers.pdb', ft, min_relax)
-    relax_structure('inputs/4ma3_lowest_rmsd.pdb', ft, min_relax)
-    #relax_structure('inputs/4ma3_lowest_score.pdb', ft, min_relax)
+    #relax_structure('inputs/legacy/4ma3_native.pdb', ft, relax_fun)
+    #relax_structure('inputs/legacy/4ma3_native_with_lowest_rmsd_rotamers.pdb', ft, relax_fun)
+    #relax_structure('inputs/legacy/4ma3_native_with_lowest_score_rotamers.pdb', ft, relax_fun)
+    #relax_structure('inputs/legacy/4ma3_lowest_rmsd_with_lowest_score_rotamers.pdb', ft, relax_fun)
+    #relax_structure('inputs/legacy/4ma3_lowest_rmsd.pdb', ft, relax_fun)
+    #relax_structure('inputs/legacy/4ma3_lowest_score.pdb', ft, relax_fun)
 
