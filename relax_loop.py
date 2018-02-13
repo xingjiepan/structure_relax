@@ -230,7 +230,7 @@ def bb_rmsd(pose1, pose2, residues):
     xyzs1 = [pose1.residue(i).xyz(a) for i in residues for a in bb_atoms] 
     xyzs2 = [pose2.residue(i).xyz(a) for i in residues for a in bb_atoms] 
 
-    return np.sqrt(sum((xyzs1[i] - xyzs2[i]).length_squared() for i in range(len(residues))) / len(residues))
+    return np.sqrt(sum((xyzs1[i] - xyzs2[i]).length_squared() for i in range(len(xyzs1))) / len(xyzs2))
 
 def write_result(output_file, pdb_id, input_type, model_id, score, rmsd):
     '''Write the result in a thread safe manner.'''
