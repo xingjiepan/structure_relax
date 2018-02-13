@@ -23,6 +23,7 @@ if __name__ == '__main__':
           '-t', '1-{0}'.format(num_jobs),
           './relax_loop.py',
           input_path,
-          output_file]
+          output_file,
+          str(num_jobs)]
 
     subprocess.check_call(cmd)
