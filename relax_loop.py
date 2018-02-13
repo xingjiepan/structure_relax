@@ -1,4 +1,11 @@
 #!/usr/bin/env python2
+#$ -S /netapp/home/xingjiepan/.local/bin/python2.7
+#$ -cwd
+#$ -r yes
+#$ -l h_rt=0:20:00
+#$ -l arch=linux-x64
+#$ -l mem_free=3G
+#$ -l netapp=1G,scratch=1G
 '''Relax the loop modeling results to evaluate the performance.
 Usage:
     ./relax_loop.py input_path output_file [total_job_num job_id]

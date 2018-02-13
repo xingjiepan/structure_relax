@@ -21,13 +21,6 @@ if __name__ == '__main__':
           '-e', 'job_outputs',
           '-o', 'job_outputs',
           '-t', '1-{0}'.format(num_jobs),
-          '-S', '/netapp/home/xingjiepan/.local/bin/python2.7',
-          '-cwd',
-          '-r', 'y',
-          '-l', 'mem_free=3G',
-          '-l', 'arch=linux-64',
-          '-l', 'netapp=1G,scratch=1G',
-          '-l', 'h_rt=0:00:30',
           './relax_loop.py',
           input_path,
           output_file]
