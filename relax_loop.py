@@ -1,6 +1,15 @@
 #!/usr/bin/env python2
+'''Relax the loop modeling results to evaluate the performance.
+Usage:
+    ./relax_loop.py input_path output_file [total_job_num job_id]
+'''
 
 import os
+import sys
+from datetime import timedelta
+
+import numpy as np
+from flufl.lock import Lock
 
 import pyrosetta
 from pyrosetta import rosetta
@@ -155,11 +164,11 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
     #    big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
     #    print '\t'.join(big_diffs)
 
-    pose.dump_pdb(os.path.join('outputs', 'relaxed_' + os.path.basename(pdb_file)))
+    #pose.dump_pdb(os.path.join('outputs', 'relaxed_' + os.path.basename(pdb_file)))
 
     return pose
 
-def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loops_file):
+def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loops_file, output_file, model_id):
     '''Relax loops and the surrounding residues. The surrounding residues
     are determined by the loops in the native_input_pdb_file.
     '''
@@ -196,16 +205,70 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
 
     relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues)
 
-    relax_structure(native_input_pdb_file, fold_tree, relax_fun)
-    relax_structure(lowest_rmsd_file, fold_tree, relax_fun)
-    relax_structure(lowest_score_file, fold_tree, relax_fun)
+    relaxed_native_pose = relax_structure(native_input_pdb_file, fold_tree, relax_fun)
+    relaxed_lowest_rmsd_pose = relax_structure(lowest_rmsd_file, fold_tree, relax_fun)
+    relaxed_lowest_score_pose = relax_structure(lowest_score_file, fold_tree, relax_fun)
+
+    write_result(output_file, os.path.basename(loops_file)[:-5], 'native', model_id * 3, relaxed_native_pose.energies().total_energy(),
+            bb_rmsd(native_pose, relaxed_native_pose, loop_residues)) 
+    write_result(output_file, os.path.basename(loops_file)[:-5], 'lowest_rmsd', model_id * 3 + 1, relaxed_lowest_rmsd_pose.energies().total_energy(), 
+            bb_rmsd(native_pose, relaxed_lowest_rmsd_pose, loop_residues)) 
+    write_result(output_file, os.path.basename(loops_file)[:-5], 'lowest_score', model_id * 3 + 2, relaxed_lowest_score_pose.energies().total_energy(), 
+            bb_rmsd(native_pose, relaxed_lowest_score_pose, loop_residues)) 
+
+def bb_rmsd(pose1, pose2, residues):
+    '''Calculate the backbone RMSD for two poses on certain residues.'''
+    bb_atoms = ['N', 'CA', 'C', 'O']
+
+    xyzs1 = [pose1.residue(i).xyz(a) for i in residues for a in bb_atoms] 
+    xyzs2 = [pose2.residue(i).xyz(a) for i in residues for a in bb_atoms] 
+
+    return np.sqrt(sum((xyzs1[i] - xyzs2[i]).length_squared() for i in range(len(residues)))) / len(residues) 
+
+def write_result(output_file, pdb_id, input_type, model_id, score, rmsd):
+    '''Write the result in a thread safe manner.'''
+    type_map = {'native':0, 'lowest_rmsd':1, 'lowest_score':2}
+    #Make a lock
+
+    lock = Lock('lock_filename')
+    lock.lifetime = timedelta(minutes=10)
+
+    #Write to the result file with a lock
+    
+    with lock:
+        open_mode = 'a' if os.path.exists(output_file) else 'w'
+
+        with open(output_file, open_mode) as f:
+            if open_mode == 'w':
+                f.write('#PDB\tModel\tLoop_rmsd\tTotal_energy\tInput_type\n')
+
+            f.write('%s\t%d\t%f\t%f\t%d\n' % (pdb_id, model_id, rmsd, score, type_map[input_type]))
+
 
 if __name__ == '__main__':
-    pyrosetta.init()
+    input_path = sys.argv[1]
+    output_file = sys.argv[2]
+    total_job_num = 1
+    job_id = 0
 
-    pdb_id = '4m6m'
+    if len(sys.argv) > 3:
+        total_job_num = int(sys.argv[3])
+        job_id = int(os.environ['SGE_TASK_ID']) - 1
+    
+    pyrosetta.init(options='-seed_offset {0}'.format(job_id))
+    
+    pdb_list = [f[:-5] for f in os.listdir(input_path) if f.endswith('.loop')]
+    
+    NUM_MODELS = 10
 
-    relax_loops('inputs/ama_ii_with_crystal_mates/{0}.pdb'.format(pdb_id), 
-            'inputs/ama_ii_with_crystal_mates/{0}_lowest_rmsd.pdb.gz'.format(pdb_id), 
-            'inputs/ama_ii_with_crystal_mates/{0}_lowest_score.pdb.gz'.format(pdb_id), 
-            'inputs/ama_ii_with_crystal_mates/{0}.loop'.format(pdb_id))
+    for i, pdb_id in enumerate(pdb_list):
+        for model_id in range(NUM_MODELS):
+            global_id = NUM_MODELS * i + model_id 
+            
+            if global_id % total_job_num == job_id:
+
+                relax_loops(os.path.join(input_path, '{0}.pdb'.format(pdb_id)), 
+                            os.path.join(input_path, '{0}_lowest_rmsd.pdb.gz'.format(pdb_id)), 
+                            os.path.join(input_path, '{0}_lowest_score.pdb.gz'.format(pdb_id)), 
+                            os.path.join(input_path, '{0}.loop'.format(pdb_id)),
+                            output_file, model_id)
