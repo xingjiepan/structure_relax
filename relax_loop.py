@@ -171,8 +171,6 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
     #    big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
     #    print '\t'.join(big_diffs)
 
-    #pose.dump_pdb(os.path.join('outputs', 'relaxed_' + os.path.basename(pdb_file)))
-
     return pose
 
 def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loops_file, output_file, model_id):
@@ -222,6 +220,10 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
             bb_rmsd(native_pose, relaxed_lowest_rmsd_pose, loop_residues)) 
     write_result(output_file, os.path.basename(loops_file)[:-5], 'lowest_score', model_id * 3 + 2, relaxed_lowest_score_pose.energies().total_energy(), 
             bb_rmsd(native_pose, relaxed_lowest_score_pose, loop_residues)) 
+    
+    relaxed_native_pose.dump_pdb(os.path.join(output_file + '.structures', 'relaxed_{0}_'.format(model_id * 3) + os.path.basename(native_input_pdb_file)))
+    relaxed_lowest_rmsd_pose.dump_pdb(os.path.join(output_file + '.structures', 'relaxed_{0}_'.format(model_id * 3 + 1) + os.path.basename(lowest_rmsd_file)))
+    relaxed_lowest_score_pose.dump_pdb(os.path.join(output_file + '.structures', 'relaxed_{0}_'.format(model_id * 3 + 2) + os.path.basename(lowest_score_file)))
 
 def bb_rmsd(pose1, pose2, residues):
     '''Calculate the backbone RMSD for two poses on certain residues.'''
@@ -247,6 +249,7 @@ def write_result(output_file, pdb_id, input_type, model_id, score, rmsd):
 
         with open(output_file, open_mode) as f:
             if open_mode == 'w':
+                os.mkdir(output_file + '.structures')
                 f.write('#PDB\tModel\tLoop_rmsd\tTotal_energy\tInput_type\n')
 
             f.write('%s\t%d\t%f\t%f\t%d\n' % (pdb_id, model_id, rmsd, score, type_map[input_type]))
