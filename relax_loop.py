@@ -89,7 +89,7 @@ def sort_residues_by_abs_total_energy_diff(scores1, scores2):
 
     return energy_diff_sorted_table
 
-def fast_relax(pose, residues_bb_movable, residues_sc_movable):
+def fast_relax(pose, residues_bb_movable, residues_sc_movable, cartesian=False):
     '''Fast relax the pose'''
     # Set up move map
 
@@ -122,14 +122,21 @@ def fast_relax(pose, residues_bb_movable, residues_sc_movable):
     task_factory.push_back(rosetta.core.pack.task.operation.RestrictToRepacking())
     task_factory.push_back(turn_off_packing)
 
+    # Set up score function
+    
+    if cartesian:
+        sfxn = rosetta.core.scoring.ScoreFunctionFactory.create_score_function("ref2015_cart")
+    else:
+        sfxn = rosetta.core.scoring.get_score_function()
+        sfxn.set_weight(rosetta.core.scoring.chainbreak, 5)
+
     # Do fast relax
 
     fast_relax_rounds = 5
-    sfxn = rosetta.core.scoring.get_score_function()
-    sfxn.set_weight(rosetta.core.scoring.chainbreak, 5)
     fast_relax = rosetta.protocols.relax.FastRelax(sfxn, fast_relax_rounds)
     fast_relax.set_movemap(mm) 
     fast_relax.set_task_factory(task_factory)
+    fast_relax.cartesian(cartesian)
 
     fast_relax.apply(pose)
  
@@ -209,7 +216,8 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
 
     # Relax the structures
 
-    relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues)
+    #relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues)
+    relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues, cartesian=True)
 
     relaxed_native_pose = relax_structure(native_input_pdb_file, fold_tree, relax_fun)
     relaxed_lowest_rmsd_pose = relax_structure(lowest_rmsd_file, fold_tree, relax_fun)
