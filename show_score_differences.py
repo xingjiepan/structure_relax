@@ -97,7 +97,10 @@ def print_score_differences(pdb_file1, pdb_file2):
 
     for i, v in energy_diff_sorted_table:
         if abs(v[0][1]) < 0.3: continue
-        print i, 'pose' if i == 0 else pose1.residue(i).name3()
+        if i == 0:
+            print i, 'pose'
+        else:
+            print pose1.pdb_info().chain(i), pose1.pdb_info().number(i), pose1.residue(i).name3()
 
         big_diffs = ['{0}'.format(x) for x in v if abs(x[1]) > 0.3]
         print '\t'.join(big_diffs)
