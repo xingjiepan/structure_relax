@@ -126,6 +126,7 @@ def fast_relax(pose, residues_bb_movable, residues_sc_movable):
 
     fast_relax_rounds = 5
     sfxn = rosetta.core.scoring.get_score_function()
+    sfxn.set_weight(rosetta.core.scoring.chainbreak, 5)
     fast_relax = rosetta.protocols.relax.FastRelax(sfxn, fast_relax_rounds)
     fast_relax.set_movemap(mm) 
     fast_relax.set_task_factory(task_factory)
