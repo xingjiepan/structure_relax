@@ -2,7 +2,7 @@
 #$ -S /netapp/home/xingjiepan/.local/bin/python2.7
 #$ -cwd
 #$ -r yes
-#$ -l h_rt=0:20:00
+#$ -l h_rt=0:30:00
 #$ -l arch=linux-x64
 #$ -l mem_free=3G
 #$ -l netapp=1G,scratch=1G
@@ -181,7 +181,7 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
 
     return pose
 
-def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loops_file, output_file, model_id):
+def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loops_file, output_file, model_id, cartesian=True):
     '''Relax loops and the surrounding residues. The surrounding residues
     are determined by the loops in the native_input_pdb_file.
     '''
@@ -194,8 +194,11 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
 
     # Get the fold tree
     
-    fold_tree = rosetta.core.kinematics.FoldTree()
-    rosetta.protocols.loops.fold_tree_from_loops(native_pose, loops, fold_tree, True)
+    if cartesian:
+        fold_tree = native_pose.fold_tree()
+    else:
+        fold_tree = rosetta.core.kinematics.FoldTree()
+        rosetta.protocols.loops.fold_tree_from_loops(native_pose, loops, fold_tree, True)
 
     # Get loop residues
 
@@ -216,8 +219,7 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
 
     # Relax the structures
 
-    #relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues)
-    relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues, cartesian=True)
+    relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues, cartesian=cartesian)
 
     relaxed_native_pose = relax_structure(native_input_pdb_file, fold_tree, relax_fun)
     relaxed_lowest_rmsd_pose = relax_structure(lowest_rmsd_file, fold_tree, relax_fun)
