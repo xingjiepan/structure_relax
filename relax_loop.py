@@ -140,7 +140,7 @@ def fast_relax(pose, residues_bb_movable, residues_sc_movable, cartesian=False):
 
     fast_relax.apply(pose)
  
-def relax_structure(pdb_file, fold_tree, relax_fun):
+def relax_structure(pdb_file, fold_tree, relax_fun, cartesian):
     '''Relax the structure from a pdb file.
     Dump the relaxed structure.
     '''
@@ -153,7 +153,10 @@ def relax_structure(pdb_file, fold_tree, relax_fun):
 
     # Score
 
-    sfxn = rosetta.core.scoring.get_score_function()
+    if cartesian:
+        sfxn = rosetta.core.scoring.ScoreFunctionFactory.create_score_function("ref2015_cart")
+    else:
+        sfxn = rosetta.core.scoring.get_score_function()
     sfxn(pose)
     print 'score_before_relax =', pose.energies().total_energy()
     scores_before_relax = get_pose_scores(pose)
@@ -221,9 +224,9 @@ def relax_loops(native_input_pdb_file, lowest_rmsd_file, lowest_score_file, loop
 
     relax_fun = lambda pose : fast_relax(pose, loop_residues, surrounding_residues, cartesian=cartesian)
 
-    relaxed_native_pose = relax_structure(native_input_pdb_file, fold_tree, relax_fun)
-    relaxed_lowest_rmsd_pose = relax_structure(lowest_rmsd_file, fold_tree, relax_fun)
-    relaxed_lowest_score_pose = relax_structure(lowest_score_file, fold_tree, relax_fun)
+    relaxed_native_pose = relax_structure(native_input_pdb_file, fold_tree, relax_fun, cartesian)
+    relaxed_lowest_rmsd_pose = relax_structure(lowest_rmsd_file, fold_tree, relax_fun, cartesian)
+    relaxed_lowest_score_pose = relax_structure(lowest_score_file, fold_tree, relax_fun, cartesian)
 
     write_result(output_file, os.path.basename(loops_file)[:-5], 'native', model_id * 3, relaxed_native_pose.energies().total_energy(),
             bb_rmsd(native_pose, relaxed_native_pose, loop_residues)) 
